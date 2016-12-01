@@ -178,7 +178,7 @@ class Control : public TCP_Session {
 				size_t pos = response.find(' ');
 				if(pos==std::string::npos) pos = response.size();
 				const std::string method_name(response.begin(), response.begin()+pos);
-				ROS_DEBUG("response from method %s", method_name.c_str());
+				ROS_DEBUG("response from method %s (%d)", method_name.c_str(), (int)(response.size()-pos));
 				
 				std::map<std::string, boost::shared_ptr<SMethod> >::iterator it = pending_methods_.find(method_name);
 				if(it!=pending_methods_.end()) {
@@ -238,6 +238,19 @@ class Control : public TCP_Session {
 	
 	//callbacks of methods
 	bool meth_GetBlobClientConfig(const std::string &data) {
+		size_t offset=0;
+		uint16_t len;
+		const char *ptr = data.c_str();
+		
+		if(data.size()-offset<2) return false;
+		len = ntohs( *((uint16_t*)(ptr+offset)) );
+		offset+=2;
+		if(data.size()-offset<len) return false;
+		std::string transport_protocol(ptr+offset, ptr+(offset+len));
+		offset+=len;
+		
+		ROS_INFO("BlobClientConfig %s", transport_protocol.c_str());
+		
 		return true;
 	}
 	
