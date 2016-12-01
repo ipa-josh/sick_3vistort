@@ -120,7 +120,7 @@ public:
 		assert(valid());
 		
 		//size + header + checksum
-		buffer_.erase(buffer_.begin(), buffer_.end()+(size()+9));
+		buffer_.erase(buffer_.begin(), buffer_.begin()+(size()+9));
 	}
 	
 	std::string get_data() const {
