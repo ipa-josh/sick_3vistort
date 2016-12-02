@@ -59,6 +59,8 @@
 #include <cv_bridge/cv_bridge.h>
 #include <boost/thread.hpp>
 #include <sensor_msgs/CameraInfo.h>
+#include <sensor_msgs/LaserScan.h>
+#include <sensor_msgs/PointCloud2.h>
 #include <std_msgs/ByteMultiArray.h>
 #include <diagnostic_updater/diagnostic_updater.h>
 
@@ -76,10 +78,11 @@ class DriverNode {
 	bool publish_all_;
 	std::string frame_id_;
 	
+	ros::NodeHandle nh_;
 	Driver_3DCS::Control *control_;
 	image_transport::ImageTransport it_;
 	image_transport::Publisher pub_depth_, pub_confidence_, pub_intensity_;
-	ros::Publisher pub_camera_info_, pub_points_, pub_ios_;
+	ros::Publisher pub_camera_info_, pub_points_, pub_ios_, pub_scan_, pub_cart_;
 	
 	boost::mutex mtx_data_;
 	boost::shared_ptr<Driver_3DCS::Data> data_;
@@ -254,9 +257,25 @@ class DriverNode {
 			_on_new_subscriber();
 	}
 	
+	void on_enablePolar(const bool enabled) {
+		if(enabled)
+			pub_scan_      = nh_.advertise<sensor_msgs::LaserScan>("scan", 2,
+				boost::bind(&DriverNode::on_new_subscriber_ros, this, _1));
+		else
+			pub_scan_.shutdown();
+	}
+	
+	void on_enableCartesian(const bool enabled) {
+		if(enabled)
+			pub_cart_      = nh_.advertise<sensor_msgs::PointCloud2>("cartesian", 2,
+				boost::bind(&DriverNode::on_new_subscriber_ros, this, _1));
+		else
+			pub_cart_.shutdown();
+	}
+	
 public:
 	DriverNode(Driver_3DCS::Control *control, ros::NodeHandle &nh) :
-		publish_all_(false), frame_id_("camera"), control_(control),  it_(nh)
+		publish_all_(false), frame_id_("camera"), nh_(nh), control_(control),  it_(nh)
 	{
 		ros::param::get("~prevent_frame_skipping", publish_all_);
 		ros::param::get("~frame_id", frame_id_);
