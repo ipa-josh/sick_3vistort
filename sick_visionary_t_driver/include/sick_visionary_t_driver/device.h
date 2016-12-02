@@ -52,9 +52,14 @@
  ****************************************************************/
  
 #include "cola.h"
-	
-};
 
+
+struct ControlVariables {
+	std::string blob_transport_protocol;
+	
+	std::string device_name, device_version;
+	uint8_t modFreq;
+};
 
 /* all methods that use the control channel (sopas) */
 class Control : public TCP_Session {
@@ -62,15 +67,21 @@ class Control : public TCP_Session {
 	const std::string remote_device_ip_;
 	bool stream_started_;
 	CoLaFrame frame_recv_;
+	ControlVariables control_variables_;
 	
 	typedef boost::signals2::signal<bool (const std::string &) > SIG_ON_METHOD;
 	
-	struct SMethod {
+	struct SData {
+		enum EType {METHOD, VARIABLE};
+		
+		EType type_;
+		StructParser parser_;
 		SIG_ON_METHOD callback_;
 		boost::timed_mutex lock_;
 		bool success_;
 	};
-	std::map<std::string, boost::shared_ptr<SMethod> > pending_methods_;
+	typedef std::map<std::string, boost::shared_ptr<SData> > DataParserMap;
+	DataParserMap data_parser_;
 	
 	inline static bool cmp_cmds(std::string &response, const std::string &cmd) {
 		if(response.compare(0, cmd.size(), cmd)==0) {
@@ -97,42 +108,45 @@ class Control : public TCP_Session {
 			std::string response = frame_recv_.get_data();
 			ROS_DEBUG("response: %s", response.c_str());
 			
-			if(cmp_cmds(response, "sAN ")) {
-				size_t pos = response.find(' ');
-				if(pos==std::string::npos) pos = response.size();
-				const std::string method_name(response.begin(), response.begin()+pos);
-				ROS_DEBUG("response from method %s (%d)", method_name.c_str(), (int)(response.size()-pos));
-				
-				std::map<std::string, boost::shared_ptr<SMethod> >::iterator it = pending_methods_.find(method_name);
-				if(it!=pending_methods_.end()) {
-					it->second->success_ = it->second->callback_(std::string(response.begin()+pos, response.end()));
+			size_t pos = response.find(' ', 4);
+			if(pos==std::string::npos) pos = response.size();
+			else pos+=1;
+			const std::string name(response.begin(), response.begin()+pos);
+			ROS_DEBUG("response from %s (%d)", name.c_str(), (int)(response.size()-pos));
+			
+			std::string data = std::string(response.begin()+pos, response.end());
+			
+			if(cmp_cmds(response, "sAN ")) {				
+				DataParserMap::iterator it = data_parser_.find(name);
+				if(it!=data_parser_.end()) {
+					if(it->second->type_!=SData::METHOD)
+						ROS_WARN("expected a variable, but got method");
+					it->second->lock_.try_lock();
+					it->second->success_  = it->second->parser_.parse(data.c_str(), data.size()) && it->second->callback_(data);
 					it->second->lock_.unlock();
-					pending_methods_.erase(it);
+					data_parser_.erase(it);
 				}
 				
 			}
-			else if(cmp_cmds(response, "sRA modFreq")) {
+			else if(cmp_cmds(response, "sRA ")) {
+				DataParserMap::iterator it = data_parser_.find(name);
+				if(it!=data_parser_.end()) {
+					if(it->second->type_!=SData::VARIABLE)
+						ROS_WARN("expected a variable, but got method");
+					it->second->lock_.try_lock();
+					it->second->success_  = it->second->parser_.parse(data.c_str(), data.size()) && it->second->callback_(data);
+					it->second->lock_.unlock();
+					data_parser_.erase(it);
+				}
+						
 				assert(response.size()==1);
 				if(response.size()>=1)
 					ROS_INFO("modFreq=%d", (int)response[0]);
 			}
-			else if(cmp_cmds(response, "sWA modFreq")) {
-				request("sRN modFreq");
-			}
-			else if(cmp_cmds(response, "sRA DeviceIdent")) {
-				uint16_t len_name=0, len_version=0;
-				if(
-					response.size()>=4 &&
-					(len_name=ntohs( *(uint16_t*)(&response[0]) ))+4<=response.size() &&
-					(len_version=ntohs( *(uint16_t*)(&response[len_name+2]) ))+len_name+4<=response.size()
-				) {
-					ROS_INFO("DeviceIdent %s / %s",
-						std::string(response.begin()+2, response.begin()+(2+len_name)).c_str(),
-						std::string(response.begin()+(4+len_name), response.begin()+(4+len_version)).c_str()
-						);
-				}
-				else
-					ROS_ERROR("error while parsing DeviceIdent response: %s", response.c_str());
+			else if(cmp_cmds(response, "sWA ")) {
+				DataParserMap::iterator it = data_parser_.find(name);
+				if(it!=data_parser_.end())
+					request("sRN "+name);
 			}
 			
 			frame_recv_.pop();
@@ -146,16 +160,45 @@ class Control : public TCP_Session {
         write(fr.finish());
 	}
 	
-	template<class FCT>
-	bool call_method(const std::string &methode_name, const FCT &callback, const std::string &data=std::string()) {
-		boost::shared_ptr<SMethod> method(new SMethod);
-		method->callback_.connect(callback);
-		pending_methods_.insert( std::pair<std::string, boost::shared_ptr<SMethod> >(methode_name, method) );
+	bool call_method(const std::string &method_name, const std::string &data=std::string()) {
+		DataParserMap::iterator it = data_parser_.find(method_name);
+		if(it==data_parser_.end() || it->second->type_!=SData::METHOD) {
+			ROS_ERROR("unknown function: %s", method_name.c_str());
+			return false;
+		}
 		
-		method->lock_.lock();
-		request("sMN "+methode_name+" "+data);
+		it->second->lock_.lock();
+		request("sMN "+method_name+" "+data);
 		
-		return method->lock_.timed_lock(boost::posix_time::seconds(1)) && method->success_;
+		return it->second->lock_.timed_lock(boost::posix_time::seconds(1)) && it->second->success_;
+	}
+	
+	bool read_variable(const std::string &variable_name) {
+		DataParserMap::iterator it = data_parser_.find(variable_name);
+		if(it==data_parser_.end() || it->second->type_!=SData::VARIABLE) {
+			ROS_ERROR("unknown variable: %s", variable_name.c_str());
+			return false;
+		}
+		
+		it->second->lock_.lock();
+		request("sRN "+variable_name);
+		
+		return it->second->lock_.timed_lock(boost::posix_time::seconds(1)) && it->second->success_;
+	}
+	
+	bool write_variable(const std::string &variable_name, const std::string &data=std::string(), const bool blocking=false) {
+		DataParserMap::iterator it = data_parser_.find(variable_name);
+		if(it==data_parser_.end() || it->second->type_!=SData::VARIABLE) {
+			ROS_ERROR("unknown variable: %s", variable_name.c_str());
+			return false;
+		}
+		
+		if(blocking) it->second->lock_.lock();
+		request("sWN "+variable_name+" "+(data.size()==0?it->second->parser_.generate():data));
+		
+		if(!blocking) return true;
+		
+		return it->second->lock_.timed_lock(boost::posix_time::seconds(1)) && it->second->success_;
 	}
 	
 	
@@ -195,6 +238,32 @@ class Control : public TCP_Session {
 		return false;
 	}
 	
+	static bool var_Dummy(const std::string &data) {
+		return true;
+	}
+	
+	
+	//helpers to setup
+	StructParser &createMethod(const std::string &methode_name, const boost::function<bool(const std::string &)> &callback) {
+		boost::shared_ptr<SData> data(new SData);
+		data->type_ = SData::METHOD;
+		data->callback_.connect(callback);
+		data_parser_.insert( std::pair<std::string, boost::shared_ptr<SData> >(methode_name, data) );
+		
+		return data->parser_;
+	}
+	
+	template<class T>
+	StructParser &createVariable(const std::string &var_name, T *variable, const boost::function<bool(const std::string &)> &callback = boost::bind(&Control::var_Dummy, _1)) {
+		boost::shared_ptr<SData> data(new SData);
+		data->type_ = SData::VARIABLE;
+		data->parser_(variable);
+		data->callback_.connect(callback);
+		data_parser_.insert( std::pair<std::string, boost::shared_ptr<SData> >(var_name, data) );
+		
+		return data->parser_;
+	}
+	
 public:
 	enum EUserLevel {RUN_LEVEL=0, OPERATOR=1, MAINTENANCE=2, AUTHORIZEDCLIENT=3, SERVICE=4};
 	enum EIlluminationCode {
@@ -208,6 +277,16 @@ public:
 		remote_device_ip_(remote_device_ip),
 		stream_started_(false)
 	{
+		//setup the methods and variables
+		createMethod("SetAccessMode", boost::bind(&Control::meth_SetAccessMode, this, _1));
+        createMethod("PLAYSTART", boost::bind(&Control::meth_PLAYSTART, this, _1));
+        createMethod("PLAYSTOP", boost::bind(&Control::meth_PLAYSTOP, this, _1));
+        createMethod("GetBlobClientConfig", boost::bind(&Control::meth_GetBlobClientConfig, this, _1))
+			(&control_variables_.blob_transport_protocol);
+			
+		createVariable("modFreq", &control_variables_.modFreq);
+		createVariable("DeviceIdent", &control_variables_.device_name)(&control_variables_.device_version);
+        
 		on_data_.connect( boost::bind(&Control::on_data, this, _1, _2, _3) );
 	}
 	
@@ -220,10 +299,10 @@ public:
             return false;
 		}
 		
-		//read device identification (to verify version)
-        request("sRN DeviceIdent");
-        //read parameters
-        request("sRN modFreq");
+        //read all parameters
+        for(DataParserMap::const_iterator it=data_parser_.begin(); it!=data_parser_.end(); it++)
+			if(it->second->type_==SData::VARIABLE)
+				read_variable(it->first);
         
         ROS_DEBUG("done.");
         return true;
@@ -232,7 +311,8 @@ public:
     void setModFreq(const EIlluminationCode illumination_code) {
         ROS_DEBUG("Setting modulation frequency to %d", (int)illumination_code);
         
-		request("sWN modFreq "+std::string(1, (char)illumination_code));
+        uint8_t code = (uint8_t)illumination_code;
+		write_variable("modFreq", StructParser()(&code).generate());
 	}
 
     /* Tells the device that there is a streaming channel by invoking a
@@ -240,7 +320,7 @@ public:
      */
     bool initStream() {
         ROS_DEBUG("Initializing streaming...");
-        return call_method("GetBlobClientConfig", boost::bind(&Control::meth_GetBlobClientConfig, this, _1));
+        return call_method("GetBlobClientConfig");
 	}
 
     /* Start streaming the data by calling the "PLAYSTART" method on the
@@ -249,24 +329,19 @@ public:
     bool startStream() {   
 		if(stream_started_) return true;
 		     
-        return call_method("PLAYSTART", boost::bind(&Control::meth_PLAYSTART, this, _1));
+        return call_method("PLAYSTART");
 	}
-            
         
     /* Stops the data stream. */
     bool stopStream() { 
         if(!stream_started_) return true;
 		     
-        return call_method("PLAYSTOP", boost::bind(&Control::meth_PLAYSTOP, this, _1));
+        return call_method("PLAYSTOP");
 	}
 	
 	/* Call: SetAccessMode to change operation mode */
-	bool setAccessMode(const uint8_t mode, const uint32_t hash) {
-		std::string data(5, (char)0);
-		*((uint8_t*) (data.c_str()+0)) = mode;
-		*((uint32_t*)(data.c_str()+1)) = htonl(hash);
-		
-        return call_method("SetAccessMode", boost::bind(&Control::meth_SetAccessMode, this, _1), data);
+	bool setAccessMode(uint8_t mode, uint32_t hash) {		
+        return call_method("SetAccessMode", StructParser()(&mode)(&hash).generate());
 	}
 	
 	bool setAccessMode(const EUserLevel user_level, const uint32_t hash=0) {
