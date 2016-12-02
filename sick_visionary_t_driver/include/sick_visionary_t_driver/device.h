@@ -51,7 +51,16 @@
  *
  ****************************************************************/
  
+#pragma once
 #include "cola.h"
+
+template<class T>
+bool read_param(const std::string &name, T &var) {
+	return ros::param::get("~"+name, var);
+}
+
+template<>
+bool read_param<uint8_t>(const std::string &name, uint8_t &var);
 
 
 struct ControlVariables {
@@ -79,6 +88,7 @@ class Control : public TCP_Session {
 		SIG_ON_METHOD callback_;
 		boost::timed_mutex lock_;
 		bool success_;
+		bool param_;
 	};
 	typedef std::map<std::string, boost::shared_ptr<SData> > DataParserMap;
 	DataParserMap data_parser_;
@@ -247,6 +257,7 @@ class Control : public TCP_Session {
 	StructParser &createMethod(const std::string &methode_name, const boost::function<bool(const std::string &)> &callback) {
 		boost::shared_ptr<SData> data(new SData);
 		data->type_ = SData::METHOD;
+		data->param_ = false;
 		data->callback_.connect(callback);
 		data_parser_.insert( std::pair<std::string, boost::shared_ptr<SData> >(methode_name, data) );
 		
@@ -254,9 +265,12 @@ class Control : public TCP_Session {
 	}
 	
 	template<class T>
-	StructParser &createVariable(const std::string &var_name, T *variable, const boost::function<bool(const std::string &)> &callback = boost::bind(&Control::var_Dummy, _1)) {
+	StructParser &createVariable(const std::string &var_name, T *variable, const bool param=false, const boost::function<bool(const std::string &)> &callback = boost::bind(&Control::var_Dummy, _1)) {
 		boost::shared_ptr<SData> data(new SData);
 		data->type_ = SData::VARIABLE;
+		data->param_ = param;
+		if(param)
+			read_param(var_name, *variable);
 		data->parser_(variable);
 		data->callback_.connect(callback);
 		data_parser_.insert( std::pair<std::string, boost::shared_ptr<SData> >(var_name, data) );
@@ -301,8 +315,12 @@ public:
 		
         //read all parameters
         for(DataParserMap::const_iterator it=data_parser_.begin(); it!=data_parser_.end(); it++)
-			if(it->second->type_==SData::VARIABLE)
-				read_variable(it->first);
+			if(it->second->type_==SData::VARIABLE) {
+				if(it->second->param_)
+					write_variable(it->first);
+				else
+					read_variable(it->first);
+			}
         
         ROS_DEBUG("done.");
         return true;

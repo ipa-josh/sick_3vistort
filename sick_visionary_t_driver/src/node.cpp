@@ -51,8 +51,8 @@
  *
  ****************************************************************/
  
-#include <sick_visionary_t_driver/driver.h>
 #include <ros/ros.h>
+#include <sick_visionary_t_driver/driver.h>
 #include <image_transport/image_transport.h>
 #include <sensor_msgs/image_encodings.h>
 #include <sensor_msgs/PointCloud2.h>
