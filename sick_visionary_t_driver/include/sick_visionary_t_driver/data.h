@@ -382,7 +382,7 @@ private:
             return length;
         }
          
-        ROS_DEBUG_STREAM("length " << length);
+        /*ROS_DEBUG_STREAM("length " << length);
         ROS_DEBUG_STREAM("timeStamp " << timeStamp);
         ROS_DEBUG_STREAM("deviceID " << deviceID);
         ROS_DEBUG_STREAM("scanCounter " << scanCounter);
@@ -394,7 +394,7 @@ private:
         ROS_DEBUG_STREAM("angularResolution " << angularResolution);
         ROS_DEBUG_STREAM("scale " << scale);
         ROS_DEBUG_STREAM("offset " << offsetF);
-        ROS_DEBUG_STREAM("numPolarValues " << numPolarValues_);
+        ROS_DEBUG_STREAM("numPolarValues " << numPolarValues_);*/
         
         size_t end = offset + 4*numPolarValues_; // calculating the end index
         ROS_ASSERT(end<=size);
@@ -417,10 +417,10 @@ private:
         offset += 4*4;
         
         //lets assume it matches the angles
-        ROS_DEBUG_STREAM("rssi_startAngle " << rssi_startAngle);
+        /*ROS_DEBUG_STREAM("rssi_startAngle " << rssi_startAngle);
         ROS_DEBUG_STREAM("rssi_angularResolution " << rssi_angularResolution);
         ROS_DEBUG_STREAM("rssi_scale " << rssi_scale);
-        ROS_DEBUG_STREAM("rssi_offset " << rssi_offset);
+        ROS_DEBUG_STREAM("rssi_offset " << rssi_offset);*/
         
         confidences_.resize(numPolarValues_);
         for(int i=0; i<numPolarValues_; i++)
@@ -463,10 +463,10 @@ private:
             return length;
         }
          
-        ROS_DEBUG_STREAM("length " << length);
+        /*ROS_DEBUG_STREAM("length " << length);
         ROS_DEBUG_STREAM("timeStamp " << timeStamp);
         ROS_DEBUG_STREAM("version " << version);
-        ROS_DEBUG_STREAM("numPoints " << numPoints);
+        ROS_DEBUG_STREAM("numPoints " << numPoints);*/
         
         size_t end = offset + 16*numPoints; // calculating the end index
         ROS_ASSERT(end<=size);
