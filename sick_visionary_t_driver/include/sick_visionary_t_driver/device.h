@@ -54,6 +54,7 @@
 #pragma once
 #include "cola.h"
 
+#define SUPPORTED_DEVICE_VERSION "2.9.4.8923R"
 
 //read parameters from "somewhere" -> ros functions outside
 bool read_param(const std::string &name, std::string &var);
