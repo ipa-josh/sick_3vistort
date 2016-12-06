@@ -71,6 +71,10 @@ const bool SUPPRESS_INVALID_POINTS = true;
 const uint16_t NARE_DISTANCE_VALUE = 0xffffU;
 
 
+bool Driver_3DCS::read_param(const std::string &name, std::string &var) {
+	return ros::param::get("~"+name, var);
+}
+
 class DriverNode {
 	
 	//member variables
