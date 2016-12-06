@@ -340,20 +340,37 @@ class Control : public TCP_Session {
 		return data->parser_;
 	}
 	
-	template<class T>
-	StructParser &createVariable(const std::string &var_name, T *variable, const bool param=false, const boost::function<bool(const std::string &)> &callback = boost::bind(&Control::var_Dummy, _1)) {
+	StructParser &_createVariable(const std::string &var_name, DatatypeParserAbstract *type, const bool param=false, const boost::function<bool(const std::string &)> &callback = boost::bind(&Control::var_Dummy, _1)) {
 		boost::shared_ptr<SData> data(new SData);
 		data->type_ = SData::VARIABLE;
-		data->param_ = param;
-		if(param)
-			read_param(var_name, *variable);
-		data->parser_(variable);
+		data->param_ = false;
+		if(param) {
+			std::string init_value;
+			data->param_ = read_param(var_name, init_value);
+			if(data->param_) {
+				ROS_DEBUG("setting variable '%s' with initial value='%s'", var_name.c_str(), init_value.c_str());
+				type->set(init_value);
+			}
+			else ROS_DEBUG("not setting variable '%s'", var_name.c_str());
+		}
+		data->parser_(type);
 		data->callback_.connect(callback);
 		data_parser_.insert( std::pair<std::string, boost::shared_ptr<SData> >(var_name, data) );
 		
 		return data->parser_;
 	}
 	
+	template<class T>
+	StructParser &createVariable(const std::string &var_name, T *variable, const bool param=false, const boost::function<bool(const std::string &)> &callback = boost::bind(&Control::var_Dummy, _1), const std::string &alternative_name=std::string()) {
+		return _createVariable(var_name, new DatatypeParser<T>(variable, alternative_name.size()>0?alternative_name:var_name), param, callback);
+	}
+	
+	template<class T>
+	DatatypeParserEnum<T> &createEnumVariable(const std::string &var_name, T *variable, const bool param=false, const boost::function<bool(const std::string &)> &callback = boost::bind(&Control::var_Dummy, _1), const std::string &alternative_name=std::string()) {
+		DatatypeParserEnum<T> *e = new DatatypeParserEnum<T>(variable, alternative_name.size()>0?alternative_name:var_name);
+		_createVariable(var_name, e, param, callback);
+		return *e;
+	}
 public:
 	enum EUserLevel {RUN_LEVEL=0, OPERATOR=1, MAINTENANCE=2, AUTHORIZEDCLIENT=3, SERVICE=4};
 	enum EIlluminationCode {
