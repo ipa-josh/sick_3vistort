@@ -59,6 +59,9 @@
 //read parameters from "somewhere" -> ros functions outside
 bool read_param(const std::string &name, std::string &var);
 
+//calc. password hash
+uint32_t calculatePasswordHash(const std::string &strPassword);
+
 struct ControlVariables {
     //blob information
     std::string blob_transport_protocol;
@@ -113,6 +116,7 @@ class Control : public TCP_Session {
     ControlVariables control_variables_;
     boost::signals2::signal< void(const ControlVariables &, const DiagnoseInfo &) > on_diag_changed_;
     boost::mutex lock_;
+    uint32_t hash_maintenance_, hash_authorized_client_, hash_service_;
     
     typedef boost::signals2::signal<bool (const std::string &) > SIG_ON_METHOD;
     
@@ -407,6 +411,22 @@ public:
     {
         on_diag_changed_.connect(diag_callback);
         
+        //setup default password hashes
+		hash_maintenance_ 		= 0x557700E6;
+		hash_authorized_client_ = 0xFB356CDE;
+		hash_service_ 			= 0xED784BAA;
+		
+#ifdef OPENSSL_ENABLED   
+        //setup passwords
+		std::string pass;
+		if(read_param("maintenance_password", pass))
+			hash_maintenance_ = calculatePasswordHash(pass);
+		if(read_param("authorized_client_password", pass))
+			hash_authorized_client_ = calculatePasswordHash(pass);
+		if(read_param("service_password", pass))
+			hash_service_ = calculatePasswordHash(pass);
+#endif
+        
         //setup the methods and variables
         DatatypeParserEnum<uint8_t> *power_mode = new DatatypeParserEnum<uint8_t>(&control_variables_.PowerMode, "_Power Mode");
         (*power_mode)
@@ -664,13 +684,13 @@ public:
     bool setAccessMode(const EUserLevel user_level, const uint32_t hash=0) {
         switch(user_level) {
             case MAINTENANCE:
-                return setAccessMode((uint8_t)user_level, hash!=0?hash:0x557700E6);
+                return setAccessMode((uint8_t)user_level, hash!=0?hash:hash_maintenance_);
                 break;
             case AUTHORIZEDCLIENT:
-                return setAccessMode((uint8_t)user_level, hash!=0?hash:0xFB356CDE);
+                return setAccessMode((uint8_t)user_level, hash!=0?hash:hash_authorized_client_);
                 break;
             case SERVICE:
-                return setAccessMode((uint8_t)user_level, hash!=0?hash:0XED784BAA);
+                return setAccessMode((uint8_t)user_level, hash!=0?hash:hash_service_);
                 break;
             default:
                 ROS_WARN("user level is not supported");
@@ -798,3 +818,4 @@ public:
             ROS_DEBUG("done.");
     }
 };
+
