@@ -392,6 +392,9 @@ public:
 		ILLUMINATION_MODE_5=4, ILLUMINATION_MODE_6=5, ILLUMINATION_MODE_7=6, ILLUMINATION_MODE_8=7,
 		ILLUMINATION_MODE_AUTOMATIC=8
 	};
+	enum EIntegrationTime {MS_0500=0, MS_1000=1, MS_1500=2, MS_2000=3, MS_2500=4};
+	enum EPowerMode {ACTIVE=0, STREAMING_STANDBY=1};
+	enum EThreeLevel {INVALID=0, ERROR=1, WARNING=2, GOOD=3};
 	
 	Control(boost::asio::io_service& io_service, const std::string &remote_device_ip,
 		const boost::function<void(const ControlVariables &, const DiagnoseInfo &)> &diag_callback) :
