@@ -478,12 +478,12 @@ public:
             
         createVariable("BlobTcpPortAPI", &control_variables_.blob_tcp_port_api, false, boost::bind(&Control::var_DiagVar, this, _1), "Blob TCP Port API");
         createVariable("DeviceIdent", &control_variables_.device_name, false, boost::bind(&Control::var_DeviceInfo, this, _1), "Device Name")(&control_variables_.device_version, "Device Version");
-        createVariable("enDepthAPI", &control_variables_.enableDepthMapAPI, false, boost::bind(&Control::var_DiagVar, this, _1), "Depth Map API enabled");
-        createVariable("enPolarAPI", &control_variables_.enablePolarScanAPI, false, boost::bind(&Control::var_DiagVar, this, _1), "Polar Scan API enabled");
-        createVariable("enHeightAPI", &control_variables_.enableHeightMapAPI, false, boost::bind(&Control::var_DiagVar, this, _1), "Height Map API enabled");
+        createVariable("enDepthAPI", &control_variables_.enableDepthMapAPI, false, boost::bind(&Control::var_DiagVar, this, _1), "_Depth Map API enabled");
+        createVariable("enPolarAPI", &control_variables_.enablePolarScanAPI, false, boost::bind(&Control::var_DiagVar, this, _1), "_Polar Scan API enabled");
+        createVariable("enHeightAPI", &control_variables_.enableHeightMapAPI, false, boost::bind(&Control::var_DiagVar, this, _1), "_Height Map API enabled");
         
-        createVariable("enPolar", &control_variables_.enablePolarScan, false, boost::bind(&Control::var_DiagVar, this, _1), "Polar Scan enabled");
-        createVariable("enCart", &control_variables_.enableCartMap, false, boost::bind(&Control::var_DiagVar, this, _1), "Cartesian Map enabled");
+        createVariable("enPolar", &control_variables_.enablePolarScan, false, boost::bind(&Control::var_DiagVar, this, _1), "_Polar Scan enabled");
+        createVariable("enCart", &control_variables_.enableCartMap, false, boost::bind(&Control::var_DiagVar, this, _1), "_Cartesian Map enabled");
         
         createEnumVariable("confAlgo", &control_variables_.confAlgo, true, boost::bind(&Control::var_DiagVar, this, _1), "Confidence algorithm");
         createEnumVariable("integrationTime", &control_variables_.integrationTime, true, boost::bind(&Control::var_DiagVar, this, _1), "Integration time")
