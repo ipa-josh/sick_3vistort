@@ -54,14 +54,9 @@
 #pragma once
 #include "cola.h"
 
-template<class T>
-bool read_param(const std::string &name, T &var) {
-	return ros::param::get("~"+name, var);
-}
 
-template<>
-bool read_param<uint8_t>(const std::string &name, uint8_t &var);
-
+//read parameters from "somewhere" -> ros functions outside
+bool read_param(const std::string &name, std::string &var);
 
 struct ControlVariables {
 	std::string blob_transport_protocol;
