@@ -408,14 +408,78 @@ public:
 		on_diag_changed_.connect(diag_callback);
 		
 		//setup the methods and variables
+		DatatypeParserEnum<uint8_t> *power_mode = new DatatypeParserEnum<uint8_t>(&control_variables_.PowerMode, "_Power Mode");
+		(*power_mode)
+			COLA_ENUM(ACTIVE)
+			COLA_ENUM(STREAMING_STANDBY);
+		
 		createMethod("SetAccessMode", boost::bind(&Control::meth_SetAccessMode, this, _1));
         createMethod("PLAYSTART", boost::bind(&Control::meth_PLAYSTART, this, _1));
         createMethod("PLAYSTOP", boost::bind(&Control::meth_PLAYSTOP, this, _1));
+        createMethod("PLAYNEXT", boost::bind(&Control::meth_PLAYSTOP, this, _1));
+        createMethod("DeviceReInit", boost::bind(&Control::meth_Dummy, this, _1));
+        createMethod("SetPwrMod", boost::bind(&Control::meth_Dummy, this, _1))((DatatypeParserAbstract*)power_mode);
         createMethod("GetBlobClientConfig", boost::bind(&Control::meth_GetBlobClientConfig, this, _1))
-			(&control_variables_.blob_transport_protocol);
+			(&control_variables_.blob_transport_protocol, "Blob Transport Protocol")
+			(&control_variables_.blob_device_ip_addr, "Blob Device IP Address")
+			(&control_variables_.blob_multicast_ip_addr, "Blob Multicast IP Address")
+			(&control_variables_.blob_tcp_port, "Blob TCP Port")
+			(&control_variables_.blob_udp_peer_port, "Blob UDP Peer Port")
+			(&control_variables_.blob_udp_local_port, "Blob UDP Local Port")
+			(&control_variables_.blob_active, "Blob Active")
+			(&control_variables_.blob_fragment_size, "Blob Fragment Size");
 			
-		createVariable("modFreq", &control_variables_.modFreq);
-		createVariable("DeviceIdent", &control_variables_.device_name)(&control_variables_.device_version);
+		createVariable("applyingParams", &control_variables_.applyingParams, false, boost::bind(&Control::var_Dummy, _1), "_applyingParams");
+		
+		createEnumVariable("modFreq", &control_variables_.modFreq, true, boost::bind(&Control::var_DiagVar, this, _1), "Modulation frequency")
+			COLA_ENUM(ILLUMINATION_MODE_1)
+			COLA_ENUM(ILLUMINATION_MODE_2)
+			COLA_ENUM(ILLUMINATION_MODE_3)
+			COLA_ENUM(ILLUMINATION_MODE_4)
+			COLA_ENUM(ILLUMINATION_MODE_5)
+			COLA_ENUM(ILLUMINATION_MODE_6)
+			COLA_ENUM(ILLUMINATION_MODE_7)
+			COLA_ENUM(ILLUMINATION_MODE_8)
+			COLA_ENUM(ILLUMINATION_MODE_AUTOMATIC);
+			
+		//system health
+		createEnumVariable("TmpLvl", &control_variables_.TmpLvl, false, boost::bind(&Control::var_DiagVar, this, _1), "Temperature Level")
+			COLA_ENUM(INVALID)
+			COLA_ENUM(ERROR)
+			COLA_ENUM(WARNING)
+			COLA_ENUM(GOOD);
+		createVariable("DoPinErr", &control_variables_.doutPinError, false, boost::bind(&Control::var_DiagVar, this, _1), "Digital output health");
+		createVariable("DoOvrld", &control_variables_.doutOverload, false, boost::bind(&Control::var_DiagVar, this, _1), "Digital output overheated");
+		createEnumVariable("DatQLvl", &control_variables_.DataQualityLevel, false, boost::bind(&Control::var_DiagVar, this, _1), "Data quality level")
+			COLA_ENUM(INVALID)
+			COLA_ENUM(ERROR)
+			COLA_ENUM(WARNING)
+			COLA_ENUM(GOOD);
+			
+		createVariable("BlobTcpPortAPI", &control_variables_.blob_tcp_port_api, false, boost::bind(&Control::var_DiagVar, this, _1), "Blob TCP Port API");
+		createVariable("DeviceIdent", &control_variables_.device_name, false, boost::bind(&Control::var_DeviceInfo, this, _1), "Device Name")(&control_variables_.device_version, "Device Version");
+		createVariable("enDepthAPI", &control_variables_.enableDepthMapAPI, false, boost::bind(&Control::var_DiagVar, this, _1), "Depth Map API enabled");
+		createVariable("enPolarAPI", &control_variables_.enablePolarScanAPI, false, boost::bind(&Control::var_DiagVar, this, _1), "Polar Scan API enabled");
+		createVariable("enHeightAPI", &control_variables_.enableHeightMapAPI, false, boost::bind(&Control::var_DiagVar, this, _1), "Height Map API enabled");
+		
+		createVariable("enPolar", &control_variables_.enablePolarScan, false, boost::bind(&Control::var_DiagVar, this, _1), "Polar Scan enabled");
+		createVariable("enCart", &control_variables_.enableCartMap, false, boost::bind(&Control::var_DiagVar, this, _1), "Cartesian Map enabled");
+		
+		createEnumVariable("confAlgo", &control_variables_.confAlgo, true, boost::bind(&Control::var_DiagVar, this, _1), "Confidence algorithm");
+		createEnumVariable("integrationTime", &control_variables_.integrationTime, true, boost::bind(&Control::var_DiagVar, this, _1), "Integration time")
+			COLA_ENUM(MS_0500)
+			COLA_ENUM(MS_1000)
+			COLA_ENUM(MS_1500)
+			COLA_ENUM(MS_2000)
+			COLA_ENUM(MS_2500);
+		createEnumVariable("nareThreshold", &control_variables_.nareThreshold, true, boost::bind(&Control::var_DiagVar, this, _1), "Amplitude threshold");
+		createVariable("framePeriod", &control_variables_.framePeriod, true, boost::bind(&Control::var_DiagVar, this, _1), "Frame Period");
+		createVariable("IOValue", &control_variables_.IOValue[0], false,  boost::bind(&Control::var_Dummy, _1), "_IO Value 0")
+			(&control_variables_.IOValue[1], "_IO Value 1")
+			(&control_variables_.IOValue[2], "_IO Value 2")
+			(&control_variables_.IOValue[3], "_IO Value 3")
+			(&control_variables_.IOValue[4], "_IO Value 4")
+			(&control_variables_.IOValue[5], "_IO Value 5");
         
 		on_data_.connect( boost::bind(&Control::on_data, this, _1, _2, _3) );
 	}
