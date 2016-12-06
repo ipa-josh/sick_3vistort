@@ -102,6 +102,8 @@ struct ControlVariables {
     bool applyingParams;
 };
 
+typedef std::map<std::string, std::string> DiagnoseInfo;
+
 /* all methods that use the control channel (sopas) */
 class Control : public TCP_Session {
 	Any_Session::SIG_ON_DATA on_data_;		///< signal handler for incoming data
@@ -109,6 +111,7 @@ class Control : public TCP_Session {
 	bool stream_started_;
 	CoLaFrame frame_recv_;
 	ControlVariables control_variables_;
+	boost::signals2::signal< void(const ControlVariables &, const DiagnoseInfo &) > on_diag_changed_;
 	boost::mutex lock_;
 	
 	typedef boost::signals2::signal<bool (const std::string &) > SIG_ON_METHOD;
@@ -136,6 +139,13 @@ class Control : public TCP_Session {
 		}
 	}
 	
+	DiagnoseInfo generateDiagnoseInfo() const {
+		DiagnoseInfo info;
+		for(DataParserMap::const_iterator it=data_parser_.begin(); it!=data_parser_.end(); it++) {
+			it->second->parser_ >> info;
+		}
+		return info;
+	}
 	void on_data(const char *data, const size_t size, Any_Session *writer)
 	{
         if(!data || size<0) {
@@ -329,11 +339,14 @@ public:
 		ILLUMINATION_MODE_AUTOMATIC=8
 	};
 	
-	Control(boost::asio::io_service& io_service, const std::string &remote_device_ip) :
+	Control(boost::asio::io_service& io_service, const std::string &remote_device_ip,
+		const boost::function<void(const ControlVariables &, const DiagnoseInfo &)> &diag_callback) :
 		TCP_Session(io_service, on_data_),
 		remote_device_ip_(remote_device_ip),
 		stream_started_(false)
 	{
+		on_diag_changed_.connect(diag_callback);
+		
 		//setup the methods and variables
 		createMethod("SetAccessMode", boost::bind(&Control::meth_SetAccessMode, this, _1));
         createMethod("PLAYSTART", boost::bind(&Control::meth_PLAYSTART, this, _1));
