@@ -402,25 +402,40 @@ public:
 		bool r = control_->connect_IO_callback(boost::bind(&DriverNode::on_IO, this, _1));
 		ROS_ASSERT(r);
 	
-		std::string channel = "NO_CHANGE";
+		std::string channel = "NO_CHANGE", user="authorizedclient";
 		ros::param::get("~prevent_frame_skipping", publish_all_);
 		ros::param::get("~frame_id", frame_id_);
 		ros::param::get("~io_polling_interval", io_polling_interval_);
 		ros::param::get("~channel", channel);
+		ros::param::get("~user", user);
+		
+        boost::algorithm::to_lower(user);
+		if(user=="run")
+			r=true;
+		else if(user=="authorizedclient")
+			r=control_->setAccessMode(Driver_3DCS::Control::AUTHORIZEDCLIENT);
+		else if(user=="maintenance")
+			r=control_->setAccessMode(Driver_3DCS::Control::MAINTENANCE);
+		else if(user=="service")
+			r=control_->setAccessMode(Driver_3DCS::Control::SERVICE);
+		else
+			ROS_ERROR("user was set to '%s', allowed are RUN, AUTHORIZEDCLIENT, MAINTENANCE, SERVICE", user.c_str());
+		ROS_ASSERT(r);
 		
 		setIOPollingInterval(io_polling_interval_);
 		
 		if(control_->isAGDevice()) {
 			if(channel=="NO_CHANGE")
-				;
+				r=true;
 			else if(channel=="DEPTHMAP")
-				control_->enableDepthMap();
+				r=control_->enableDepthMap();
 			else if(channel=="POLAR2D")
-				control_->enablePolarScan();
+				r=control_->enablePolarScan();
 			else if(channel=="CARTESIAN")
-				control_->enableHeightMap();
+				r=control_->enableHeightMap();
 			else
 				ROS_ERROR("channel was set to '%s', allowed are NO_CHANGE, DEPTHMAP, POLAR2D, CARTESIAN", channel.c_str());
+			ROS_ASSERT(r);
 				
 			srv_enable_depth_map_ = nh.advertiseService("enableDepthMap", &DriverNode::enableDepthMap, this);
 			srv_enable_height_map_ = nh.advertiseService("enableHeightMap", &DriverNode::enableHeightMap, this);
