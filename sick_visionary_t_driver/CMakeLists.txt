@@ -10,6 +10,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 find_package(Boost REQUIRED COMPONENTS system)
 find_package(OpenCV REQUIRED)
+find_package(OpenSSL)
 
 catkin_package(
   INCLUDE_DIRS include
@@ -24,9 +25,14 @@ include_directories(
 
 add_executable(sick_visionary_t_driver_node src/node.cpp src/driver.cpp)
 
+if(OPENSSL_FOUND)
+	target_compile_definitions(sick_visionary_t_driver_node PRIVATE OPENSSL_ENABLED=1)
+endif()
+
 target_link_libraries(sick_visionary_t_driver_node
   ${catkin_LIBRARIES}
   ${OpenCV_LIBS}
+  ${OPENSSL_LIBRARIES}
 )
 
 ### TEST ###
