@@ -60,10 +60,46 @@
 bool read_param(const std::string &name, std::string &var);
 
 struct ControlVariables {
+	//blob information
 	std::string blob_transport_protocol;
+	std::string blob_device_ip_addr;
+	std::string blob_multicast_ip_addr;
+	uint16_t blob_tcp_port;
+	uint16_t blob_udp_peer_port;
+	uint16_t blob_udp_local_port;
+	bool blob_active;
+	uint16_t blob_fragment_size;
+	uint16_t blob_tcp_port_api;
 	
-	std::string device_name, device_version;
+	//IOs
+	int8_t IOValue[6];
+	
+	//parameters
+	uint16_t framePeriod;
+	uint8_t confAlgo;
+	uint8_t integrationTime;
+	uint8_t nareThreshold;
 	uint8_t modFreq;
+	
+	//health
+	uint8_t TmpLvl;
+	uint32_t doutPinError;
+	uint8_t doutOverload;
+	uint8_t DataQualityLevel;
+	
+	//control parameters
+	uint8_t PowerMode;
+	bool enableDepthMapAPI;
+	bool enablePolarScanAPI;
+	bool enableHeightMapAPI;
+	bool enablePolarScan;
+	bool enableCartMap;
+	
+	//device information
+	std::string device_name, device_version;
+	
+	//internal states
+	bool applyingParams;
 };
 
 /* all methods that use the control channel (sopas) */
