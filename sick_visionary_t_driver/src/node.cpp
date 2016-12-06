@@ -350,6 +350,8 @@ int main(int argc, char **argv) {
 	ros::Publisher diag_pub = nh.advertise<diagnostic_msgs::DiagnosticStatus>("/diagnostics", 1);
 	boost::bind(&on_diagnostic_status_changed, _1, &diag_pub);
 	
+	boost::thread thr(boost::bind(&boost::asio::io_service::run, &io_service));
+
 	Driver_3DCS::Control control(io_service, remote_device_ip);
 	r=control.open();
 	ROS_ASSERT(r);
@@ -357,8 +359,6 @@ int main(int argc, char **argv) {
 	ROS_ASSERT(r);
 	
 	DriverNode driver(&control, nh);
-	
-	boost::thread thr(boost::bind(&boost::asio::io_service::run, &io_service));
 	
 	Driver_3DCS::Streaming device(io_service, remote_device_ip);
 	device.getSignal().connect( boost::bind(&DriverNode::on_frame, &driver, _1) );

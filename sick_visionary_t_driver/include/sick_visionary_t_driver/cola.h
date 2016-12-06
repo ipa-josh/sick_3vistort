@@ -139,6 +139,11 @@ class DatatypeParserAbstract {
 public:
 	virtual size_t parse(const char *data_ptr, const size_t remaining_size)=0;
 	virtual std::string generate()=0;
+	virtual void set(const std::string &)=0;
+	
+	//accessors for diagnose info.
+	virtual std::string name() const=0;
+	virtual std::string str() const=0;
 };
 
 namespace DatatypeParserTemplate {
@@ -209,10 +214,12 @@ namespace DatatypeParserTemplate {
 
 template<class T>
 class DatatypeParser : public DatatypeParserAbstract {
+protected:
 	T *variable_;
+	std::string name_;
 	
 public:
-	DatatypeParser(T *variable) : variable_(variable)
+	DatatypeParser(T *variable, const std::string &name="") : variable_(variable), name_(name)
 	{
 		assert(variable_);
 	}
@@ -235,13 +242,30 @@ public:
 		
 		return r;
 	}
+	
+	virtual void set(const std::string &data) {
+		assert(variable_);
+		*variable_ = boost::lexical_cast<T>(data);
+	}
+	
+	virtual std::string str() const {
+		assert(variable_);
+		return boost::lexical_cast<std::string>(*variable_);
+	}
+	
+	virtual std::string name() const {
+		return name_;
+	}
 };
 
 template<>
 class DatatypeParser<std::string> : public DatatypeParserAbstract {
+protected:
 	std::string *variable_;
+	std::string name_;
+	
 public:
-	DatatypeParser(std::string *variable) : variable_(variable)
+	DatatypeParser(std::string *variable, const std::string &name="") : variable_(variable), name_(name)
 	{
 		assert(variable_);
 	}
@@ -267,7 +291,57 @@ public:
 		
 		return DatatypeParser<uint16_t>(&len).generate() + *variable_;
 	}
+	
+	virtual void set(const std::string &data) {
+		assert(variable_);
+		*variable_ = data;
+	}
+	
+	virtual std::string str() const {
+		assert(variable_);
+		return *variable_;
+	}
+	
+	virtual std::string name() const {
+		return name_;
+	}
 };
+
+template<class T>
+class DatatypeParserEnum : public DatatypeParser<T> {
+	std::map<std::string, T> map_named_;
+	std::map<T, std::string> map_valued_;
+public:
+	DatatypeParserEnum(T *variable, const std::string &name="") : DatatypeParser<T>(variable, name)
+	{
+	}
+	
+	virtual void set(const std::string &data) {
+		assert(this->variable_);
+		typename std::map<std::string, T>::const_iterator it = map_named_.find(data);
+		if(it!=map_named_.end())
+			*this->variable_ = it->second;
+		else
+			*this->variable_ = boost::lexical_cast<T>(data);
+	}
+	
+	DatatypeParserEnum &operator()(const std::string &key, const T &value)
+	{
+		map_named_[key] = value;
+		map_valued_[value] = key;
+		return *this;
+	}
+	
+	virtual std::string str() const {
+		assert(this->variable_);
+		typename std::map<T, std::string>::const_iterator it = map_valued_.find(*this->variable_);
+		if(it!=map_valued_.end())
+			return it->second;
+		return boost::lexical_cast<std::string>( (int) *this->variable_);
+	}
+};
+
+#define COLA_ENUM(x) (#x, x)
 
 class StructParser {
 	std::vector<DatatypeParserAbstract*> elements_;
@@ -278,8 +352,13 @@ public:
 	}
 	
 	template<class T>
-	StructParser &operator()(T *variable) {
-		elements_.push_back(new DatatypeParser<T>(variable));
+	StructParser &operator()(T *variable, const std::string &name="") {
+		elements_.push_back(new DatatypeParser<T>(variable, name));
+		return *this;
+	}
+	
+	StructParser &operator()(DatatypeParserAbstract *variable) {
+		elements_.push_back(variable);
 		return *this;
 	}
 	
@@ -303,5 +382,13 @@ public:
 		for(size_t i=0; i<elements_.size(); i++)
 			r += elements_[i]->generate();
 		return r;
+	}
+	
+	StructParser &operator>>(std::map<std::string, std::string> &info) {
+		for(size_t i=0; i<elements_.size(); i++) {
+			if(elements_[i]->name().size()>0)
+				info[elements_[i]->name()] = elements_[i]->str();
+		}
+		return *this;
 	}
 };

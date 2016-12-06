@@ -77,6 +77,7 @@ class Control : public TCP_Session {
 	bool stream_started_;
 	CoLaFrame frame_recv_;
 	ControlVariables control_variables_;
+	boost::mutex lock_;
 	
 	typedef boost::signals2::signal<bool (const std::string &) > SIG_ON_METHOD;
 	
@@ -110,18 +111,26 @@ class Control : public TCP_Session {
             return;
 		}
 		
+		boost::mutex::scoped_lock lock(lock_);
+		
 		ROS_DEBUG("got data for control");
 		
 		frame_recv_.add_data(data, size);
 		
 		while(frame_recv_.pop_until_valid()) {
 			std::string response = frame_recv_.get_data();
-			ROS_DEBUG("response: %s", response.c_str());
+			ROS_DEBUG("response: %s (%d)", response.c_str(), (int)response.size());
 			
 			size_t pos = response.find(' ', 4);
-			if(pos==std::string::npos) pos = response.size();
-			else pos+=1;
-			const std::string name(response.begin(), response.begin()+pos);
+			std::string name;
+			if(pos==std::string::npos) {
+				pos = response.size();
+				name = response;
+			}
+			else {
+				pos+=1;
+				name = std::string(response.begin(), response.begin()+pos);
+			}
 			ROS_DEBUG("response from %s (%d)", name.c_str(), (int)(response.size()-pos));
 			
 			std::string data = std::string(response.begin()+pos, response.end());
@@ -134,7 +143,6 @@ class Control : public TCP_Session {
 					it->second->lock_.try_lock();
 					it->second->success_  = it->second->parser_.parse(data.c_str(), data.size()) && it->second->callback_(data);
 					it->second->lock_.unlock();
-					data_parser_.erase(it);
 				}
 				
 			}
@@ -146,7 +154,6 @@ class Control : public TCP_Session {
 					it->second->lock_.try_lock();
 					it->second->success_  = it->second->parser_.parse(data.c_str(), data.size()) && it->second->callback_(data);
 					it->second->lock_.unlock();
-					data_parser_.erase(it);
 				}
 						
 				assert(response.size()==1);
@@ -180,7 +187,9 @@ class Control : public TCP_Session {
 		it->second->lock_.lock();
 		request("sMN "+method_name+" "+data);
 		
-		return it->second->lock_.timed_lock(boost::posix_time::seconds(1)) && it->second->success_;
+		bool ret = it->second->lock_.timed_lock(boost::posix_time::seconds(1)) && it->second->success_;
+		ROS_DEBUG("call '%s': %s", method_name.c_str(), ret?"success":"failure");
+		return ret;
 	}
 	
 	bool read_variable(const std::string &variable_name) {
@@ -193,7 +202,9 @@ class Control : public TCP_Session {
 		it->second->lock_.lock();
 		request("sRN "+variable_name);
 		
-		return it->second->lock_.timed_lock(boost::posix_time::seconds(1)) && it->second->success_;
+		bool ret = it->second->lock_.timed_lock(boost::posix_time::seconds(1)) && it->second->success_;
+		ROS_DEBUG("read '%s': %s", variable_name.c_str(), ret?"success":"failure");
+		return ret;
 	}
 	
 	bool write_variable(const std::string &variable_name, const std::string &data=std::string(), const bool blocking=false) {
