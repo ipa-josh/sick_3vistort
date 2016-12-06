@@ -412,19 +412,19 @@ public:
         on_diag_changed_.connect(diag_callback);
         
         //setup default password hashes
-		hash_maintenance_ 		= 0x557700E6;
-		hash_authorized_client_ = 0xFB356CDE;
-		hash_service_ 			= 0xED784BAA;
-		
+        hash_maintenance_       = 0x557700E6;
+        hash_authorized_client_ = 0xFB356CDE;
+        hash_service_           = 0xED784BAA;
+        
 #ifdef OPENSSL_ENABLED   
         //setup passwords
-		std::string pass;
-		if(read_param("maintenance_password", pass))
-			hash_maintenance_ = calculatePasswordHash(pass);
-		if(read_param("authorized_client_password", pass))
-			hash_authorized_client_ = calculatePasswordHash(pass);
-		if(read_param("service_password", pass))
-			hash_service_ = calculatePasswordHash(pass);
+        std::string pass;
+        if(read_param("maintenance_password", pass))
+            hash_maintenance_ = calculatePasswordHash(pass);
+        if(read_param("authorized_client_password", pass))
+            hash_authorized_client_ = calculatePasswordHash(pass);
+        if(read_param("service_password", pass))
+            hash_service_ = calculatePasswordHash(pass);
 #endif
         
         //setup the methods and variables
