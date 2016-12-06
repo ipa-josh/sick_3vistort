@@ -3,7 +3,7 @@
 
 #ifdef OPENSSL_ENABLED
 #include <openssl/md5.h>
-df
+
 uint32_t Driver_3DCS::calculatePasswordHash(const std::string &strPassword)
 {
     unsigned char dig[MD5_DIGEST_LENGTH];
