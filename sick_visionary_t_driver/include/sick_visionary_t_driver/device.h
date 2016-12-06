@@ -371,6 +371,20 @@ class Control : public TCP_Session {
 		_createVariable(var_name, e, param, callback);
 		return *e;
 	}
+	
+	bool waitForParamsApplied() {
+		control_variables_.applyingParams = true;
+		for(int i=0; i<30; i++) {
+			ros::Duration(0.2).sleep();
+			read_variable("applyingParams");
+			if(!control_variables_.applyingParams) return true;
+		}
+		
+		ROS_WARN("waitForParamsApplied failed");
+		
+		return false;
+	}
+	
 public:
 	enum EUserLevel {RUN_LEVEL=0, OPERATOR=1, MAINTENANCE=2, AUTHORIZEDCLIENT=3, SERVICE=4};
 	enum EIlluminationCode {
