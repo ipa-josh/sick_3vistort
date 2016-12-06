@@ -420,6 +420,26 @@ public:
 		on_data_.connect( boost::bind(&Control::on_data, this, _1, _2, _3) );
 	}
 	
+	bool connect_IO_callback(const boost::function<bool(const std::string &)> &io_callback) {
+		const std::string variable_name = "IOValue";
+		DataParserMap::iterator it = data_parser_.find(variable_name);
+		if(it==data_parser_.end() || it->second->type_!=SData::VARIABLE) {
+			ROS_ERROR("unknown variable: %s", variable_name.c_str());
+			return false;
+		}
+		
+		it->second->callback_.connect(io_callback);
+		return true;
+	}
+	
+	bool isAGDevice() const {
+		return control_variables_.device_name.find("AG")!=std::string::npos;
+	}
+	
+	void triggerIO() {
+		request("sRN IOValue");
+	}
+	
     /* establish the control channel to the device */
     bool open() {
         ROS_DEBUG("Connecting to device...");
@@ -429,6 +449,99 @@ public:
             return false;
 		}
 		
+        ROS_DEBUG("done.");
+        
+		return true;
+	}
+	
+	bool setFramePeriod(uint16_t hz) {
+		if(!write_variable("framePeriod", StructParser()(&hz).generate(), true))
+			return false;
+		return call_method("DeviceReInit");
+	}
+	
+	bool enableDepthMap() {
+		bool var;
+		
+		if(control_variables_.enableCartMap || control_variables_.enablePolarScan) {
+			var = false;
+			if(!write_variable("enCart", StructParser()(&var).generate(), true))
+				return false;
+			var = false;
+			if(!write_variable("enPolar", StructParser()(&var).generate(), true))
+				return false;
+				
+			waitForParamsApplied();
+		}
+		
+		var = false;
+		if(!write_variable("enPolarAPI", StructParser()(&var).generate(), true))
+			return false;
+		var = false;
+		if(!write_variable("enHeightAPI", StructParser()(&var).generate(), true))
+			return false;
+		var = true;
+		if(!write_variable("enDepthAPI", StructParser()(&var).generate(), true))
+			return false;
+			
+		return call_method("DeviceReInit");
+	}
+	
+	bool enablePolarScan() {
+		bool var;
+		
+		if(control_variables_.enableCartMap) { //just one of these can run
+			var = false;
+			if(!write_variable("enCart", StructParser()(&var).generate(), true))
+				return false;
+			var = false;
+			if(!write_variable("enHeightAPI", StructParser()(&var).generate(), true))
+				return false;
+		}
+		
+		var = true;
+		if(!write_variable("enPolar", StructParser()(&var).generate(), true))
+			return false;
+		waitForParamsApplied();
+		
+		var = false;
+		if(!write_variable("enDepthAPI", StructParser()(&var).generate(), true))
+			return false;
+		var = true;
+		if(!write_variable("enPolarAPI", StructParser()(&var).generate(), true))
+			return false;
+			
+		return call_method("DeviceReInit");
+	}
+	
+	bool enableHeightMap() {
+		bool var;
+		
+		if(control_variables_.enablePolarScan) { //just one of these can run
+			var = false;
+			if(!write_variable("enPolar", StructParser()(&var).generate(), true))
+				return false;
+			var = false;
+			if(!write_variable("enPolarAPI", StructParser()(&var).generate(), true))
+				return false;
+		}
+		
+		var = true;
+		if(!write_variable("enCart", StructParser()(&var).generate(), true))
+			return false;
+		waitForParamsApplied();
+		
+		var = false;
+		if(!write_variable("enDepthAPI", StructParser()(&var).generate(), true))
+			return false;
+		var = true;
+		if(!write_variable("enHeightAPI", StructParser()(&var).generate(), true))
+			return false;
+			
+		return call_method("DeviceReInit");
+	}
+		
+    bool read_parameters() {
         //read all parameters
         for(DataParserMap::const_iterator it=data_parser_.begin(); it!=data_parser_.end(); it++)
 			if(it->second->type_==SData::VARIABLE) {
@@ -438,7 +551,6 @@ public:
 					read_variable(it->first);
 			}
         
-        ROS_DEBUG("done.");
         return true;
     }
     
@@ -472,6 +584,13 @@ public:
 		     
         return call_method("PLAYSTOP");
 	}
+        
+    /* Requests one frame. */
+    bool singleStep() { 
+        if(stream_started_) return true;
+		     
+        return call_method("PLAYNEXT");
+	}
 	
 	/* Call: SetAccessMode to change operation mode */
 	bool setAccessMode(uint8_t mode, uint32_t hash) {		
@@ -481,13 +600,13 @@ public:
 	bool setAccessMode(const EUserLevel user_level, const uint32_t hash=0) {
 		switch(user_level) {
 			case MAINTENANCE:
-				return setAccessMode(user_level, hash!=0?hash:0x557700E6);
+				return setAccessMode((uint8_t)user_level, hash!=0?hash:0x557700E6);
 				break;
 			case AUTHORIZEDCLIENT:
-				return setAccessMode(user_level, hash!=0?hash:0xFB356CDE);
+				return setAccessMode((uint8_t)user_level, hash!=0?hash:0xFB356CDE);
 				break;
 			case SERVICE:
-				return setAccessMode(user_level, hash!=0?hash:0XED784BAA);
+				return setAccessMode((uint8_t)user_level, hash!=0?hash:0XED784BAA);
 				break;
 			default:
 				ROS_WARN("user level is not supported");
@@ -496,6 +615,10 @@ public:
 		}
 		
 		return false;
+	}
+	
+	const ControlVariables &getControlVariables() const {
+		return control_variables_;
 	}
 };
 
