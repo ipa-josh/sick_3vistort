@@ -239,6 +239,9 @@ class Control : public TCP_Session {
 		
 		bool ret = it->second->lock_.timed_lock(boost::posix_time::seconds(1)) && it->second->success_;
 		ROS_DEBUG("call '%s': %s", method_name.c_str(), ret?"success":"failure");
+		
+		it->second->lock_.try_lock();
+		it->second->lock_.unlock();
 		return ret;
 	}
 	
