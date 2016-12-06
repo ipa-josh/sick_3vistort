@@ -146,6 +146,23 @@ class Control : public TCP_Session {
 		}
 		return info;
 	}
+	
+	static void parse_response(const std::string &response, std::string &name, std::string &data)
+	{
+		size_t pos = response.find(' ', 4);
+		if(pos==std::string::npos) {
+			pos = response.size();
+			name = response;
+		}
+		else {
+			name = std::string(response.begin(), response.begin()+pos);
+			pos+=1;
+		}
+		ROS_DEBUG("response from %s (%d)", name.c_str(), (int)(response.size()-pos));
+		
+		data = std::string(response.begin()+pos, response.end());
+	}
+	
 	void on_data(const char *data, const size_t size, Any_Session *writer)
 	{
         if(!data || size<0) {
@@ -161,23 +178,10 @@ class Control : public TCP_Session {
 		
 		while(frame_recv_.pop_until_valid()) {
 			std::string response = frame_recv_.get_data();
-			ROS_DEBUG("response: %s (%d)", response.c_str(), (int)response.size());
 			
-			size_t pos = response.find(' ', 4);
-			std::string name;
-			if(pos==std::string::npos) {
-				pos = response.size();
-				name = response;
-			}
-			else {
-				pos+=1;
-				name = std::string(response.begin(), response.begin()+pos);
-			}
-			ROS_DEBUG("response from %s (%d)", name.c_str(), (int)(response.size()-pos));
-			
-			std::string data = std::string(response.begin()+pos, response.end());
-			
-			if(cmp_cmds(response, "sAN ")) {				
+			std::string name, data;
+			if(cmp_cmds(response, "sAN ")) {
+				parse_response(response, name, data);
 				DataParserMap::iterator it = data_parser_.find(name);
 				if(it!=data_parser_.end()) {
 					if(it->second->type_!=SData::METHOD)
@@ -186,9 +190,10 @@ class Control : public TCP_Session {
 					it->second->success_  = it->second->parser_.parse(data.c_str(), data.size()) && it->second->callback_(data);
 					it->second->lock_.unlock();
 				}
-				
+				else ROS_DEBUG("no handler for method: '%s'", name.c_str());
 			}
 			else if(cmp_cmds(response, "sRA ")) {
+				parse_response(response, name, data);
 				DataParserMap::iterator it = data_parser_.find(name);
 				if(it!=data_parser_.end()) {
 					if(it->second->type_!=SData::VARIABLE)
@@ -197,16 +202,19 @@ class Control : public TCP_Session {
 					it->second->success_  = it->second->parser_.parse(data.c_str(), data.size()) && it->second->callback_(data);
 					it->second->lock_.unlock();
 				}
-						
-				assert(response.size()==1);
-				if(response.size()>=1)
-					ROS_INFO("modFreq=%d", (int)response[0]);
+				else ROS_DEBUG("no handler for variable: '%s'", name.c_str());
 			}
 			else if(cmp_cmds(response, "sWA ")) {
+				parse_response(response, name, data);
 				DataParserMap::iterator it = data_parser_.find(name);
 				if(it!=data_parser_.end())
 					request("sRN "+name);
 			}
+			else if(cmp_cmds(response, "sFA")) {
+				ROS_ERROR("error notification by SOPAS");
+			}
+			else
+				ROS_ERROR("unknown command '%s'", response.c_str());
 			
 			frame_recv_.pop();
 		}
@@ -245,7 +253,13 @@ class Control : public TCP_Session {
 		request("sRN "+variable_name);
 		
 		bool ret = it->second->lock_.timed_lock(boost::posix_time::seconds(1)) && it->second->success_;
-		ROS_DEBUG("read '%s': %s", variable_name.c_str(), ret?"success":"failure");
+		if(!ret)
+			ROS_WARN("read '%s': %s", variable_name.c_str(), ret?"success":"failure");
+		else
+			ROS_DEBUG("read '%s': %s", variable_name.c_str(), ret?"success":"failure");
+		
+		it->second->lock_.try_lock();
+		it->second->lock_.unlock();
 		return ret;
 	}
 	
@@ -261,25 +275,21 @@ class Control : public TCP_Session {
 		
 		if(!blocking) return true;
 		
-		return it->second->lock_.timed_lock(boost::posix_time::seconds(1)) && it->second->success_;
+		bool ret = it->second->lock_.timed_lock(boost::posix_time::seconds(1)) && it->second->success_;
+		
+		it->second->lock_.try_lock();
+		it->second->lock_.unlock();
+		return ret;
 	}
 	
 	
 	//callbacks of methods
 	bool meth_GetBlobClientConfig(const std::string &data) {
-		size_t offset=0;
-		uint16_t len;
-		const char *ptr = data.c_str();
-		
-		if(data.size()-offset<2) return false;
-		len = ntohs( *((uint16_t*)(ptr+offset)) );
-		offset+=2;
-		if(data.size()-offset<len) return false;
-		std::string transport_protocol(ptr+offset, ptr+(offset+len));
-		offset+=len;
-		
-		ROS_INFO("BlobClientConfig %s", transport_protocol.c_str());
-		
+		on_diag_changed_(control_variables_, generateDiagnoseInfo());
+		return true;
+	}
+	
+	bool meth_Dummy(const std::string &data) {
 		return true;
 	}
 	
@@ -305,6 +315,19 @@ class Control : public TCP_Session {
 		return true;
 	}
 	
+	bool var_DiagVar(const std::string &data) {
+		on_diag_changed_(control_variables_, generateDiagnoseInfo());
+		return true;
+	}
+	
+	bool var_DeviceInfo(const std::string &data) {
+		if(control_variables_.device_version!=SUPPORTED_DEVICE_VERSION)
+			ROS_WARN("unsupported device version: '%s' (Supported: %s)",
+				control_variables_.device_version.c_str(),
+				SUPPORTED_DEVICE_VERSION);
+			
+		return var_DiagVar(data);
+	}
 	
 	//helpers to setup
 	StructParser &createMethod(const std::string &methode_name, const boost::function<bool(const std::string &)> &callback) {
