@@ -64,6 +64,8 @@
 #include <std_msgs/ByteMultiArray.h>
 #include <diagnostic_updater/diagnostic_updater.h>
 #include <std_srvs/Trigger.h>
+#include <dynamic_reconfigure/server.h>
+#include <sick_visionary_t_driver/driver_3DCSConfig.h>
 
 /// Flag whether invalid points are to be replaced by NaN
 const bool SUPPRESS_INVALID_POINTS = true;
@@ -84,6 +86,7 @@ class DriverNode {
     std::string frame_id_;
     
     ros::NodeHandle nh_;
+    dynamic_reconfigure::Server<sick_visionary_t::driver_3DCSConfig> reconf_server_;
     Driver_3DCS::Control *control_;
     image_transport::ImageTransport it_;
     image_transport::Publisher pub_depth_, pub_confidence_, pub_intensity_;
@@ -441,6 +444,8 @@ public:
             srv_enable_height_map_ = nh.advertiseService("enableHeightMap", &DriverNode::enableHeightMap, this);
             srv_enable_polar_scan_ = nh.advertiseService("enablePolarScan", &DriverNode::enablePolarScan, this);
         }
+
+        reconf_server_.setCallback(boost::bind(&DriverNode::reconfigure_callback, this, _1, _2));
     }
     
     ~DriverNode() {
@@ -450,6 +455,12 @@ public:
         pub_camera_info_.shutdown();
         pub_points_.shutdown();
         pub_ios_.shutdown();
+    }
+
+    void reconfigure_callback(sick_visionary_t::driver_3DCSConfig &config, uint32_t level) {
+        if(config.framePeriod!=control_->getControlVariables().framePeriod)
+            control_->setFramePeriod(config.framePeriod);
+        //config.PowerMode
     }
 
     void on_frame(const boost::shared_ptr<Driver_3DCS::Data> &data) {
