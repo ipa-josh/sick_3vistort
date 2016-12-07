@@ -4,6 +4,7 @@ project(sick_visionary_t_driver)
 find_package(catkin REQUIRED COMPONENTS
   cv_bridge
   image_transport
+  dynamic_reconfigure
   roscpp
   roslaunch
 )
@@ -11,6 +12,12 @@ find_package(catkin REQUIRED COMPONENTS
 find_package(Boost REQUIRED COMPONENTS system)
 find_package(OpenCV REQUIRED)
 find_package(OpenSSL)
+
+
+#add dynamic reconfigure api
+generate_dynamic_reconfigure_options(
+  cfg/sick_visionary_t_driver.cfg
+)
 
 catkin_package(
   INCLUDE_DIRS include
@@ -24,6 +31,9 @@ include_directories(
 )
 
 add_executable(sick_visionary_t_driver_node src/node.cpp src/driver.cpp)
+
+# make sure configure headers are built before any node using them
+add_dependencies(sick_visionary_t_driver_node ${PROJECT_NAME}_gencfg)
 
 if(OPENSSL_FOUND)
 	target_compile_definitions(sick_visionary_t_driver_node PRIVATE OPENSSL_ENABLED=1)

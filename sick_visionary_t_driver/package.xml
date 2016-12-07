@@ -18,5 +18,6 @@
   <depend>roscpp</depend>
   <depend>roslaunch</depend>
   <depend>sensor_msgs</depend>
+  <depend>dynamic_reconfigure</depend>
 
 </package>
