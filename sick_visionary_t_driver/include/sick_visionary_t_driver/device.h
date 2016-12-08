@@ -86,6 +86,7 @@ struct ControlVariables {
     float mountingTilt;
     float mountingAngle;
     float mountingHeight;
+    uint8_t confidenceThreshold;
     
     //health
     uint8_t TmpLvl;
@@ -497,6 +498,7 @@ public:
         createVariable("mountingTilt", &control_variables_.mountingTilt, true, boost::bind(&Control::var_DiagVar, this, _1), "Sensor mounting tilt");
         createVariable("mountingAngle", &control_variables_.mountingAngle, true, boost::bind(&Control::var_DiagVar, this, _1), "Sensor mounting angle");
         createVariable("mountingHeight", &control_variables_.mountingHeight, true, boost::bind(&Control::var_DiagVar, this, _1), "Sensor mounting height");
+        createVariable("confidenceThreshold", &control_variables_.confidenceThreshold, true, boost::bind(&Control::var_DiagVar, this, _1), "Confidence threshold");
         
         createEnumVariable("confAlgo", &control_variables_.confAlgo, true, boost::bind(&Control::var_DiagVar, this, _1), "Confidence algorithm")
             COLA_ENUM(SQUAREAMP)
@@ -509,7 +511,7 @@ public:
             COLA_ENUM(MS_1500)
             COLA_ENUM(MS_2000)
             COLA_ENUM(MS_2500);
-        createEnumVariable("nareThreshold", &control_variables_.nareThreshold, true, boost::bind(&Control::var_DiagVar, this, _1), "Amplitude threshold");
+        createVariable("nareThreshold", &control_variables_.nareThreshold, true, boost::bind(&Control::var_DiagVar, this, _1), "Amplitude threshold");
         createVariable("framePeriod", &control_variables_.framePeriod, true, boost::bind(&Control::var_DiagVar, this, _1), "Frame Period");
         createVariable("IOValue", &control_variables_.IOValue[0], false,  boost::bind(&Control::var_Dummy, _1), "_IO Value 0")
             (&control_variables_.IOValue[1], "_IO Value 1")
