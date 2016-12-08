@@ -461,6 +461,15 @@ public:
         if(config.framePeriod!=control_->getControlVariables().framePeriod)
             control_->setFramePeriod(config.framePeriod);
         //config.PowerMode
+        
+        if(level==1)
+			control_->setIOValue(0, config.IO_0);
+        if(level==2)
+			control_->setIOValue(1, config.IO_1);
+        if(level==4)
+			control_->setIOValue(2, config.IO_2);
+        if(level==8)
+			control_->setIOValue(3, config.IO_3);
     }
 
     void on_frame(const boost::shared_ptr<Driver_3DCS::Data> &data) {

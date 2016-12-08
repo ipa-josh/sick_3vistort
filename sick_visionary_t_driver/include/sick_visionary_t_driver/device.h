@@ -103,6 +103,8 @@ struct ControlVariables {
     
     //internal states
     bool applyingParams;
+    uint8_t setIO_pin;
+    bool setIO_value;
 };
 
 typedef std::map<std::string, std::string> DiagnoseInfo;
@@ -448,6 +450,9 @@ public:
             (&control_variables_.blob_udp_local_port, "Blob UDP Local Port")
             (&control_variables_.blob_active, "Blob Active")
             (&control_variables_.blob_fragment_size, "Blob Fragment Size");
+        createMethod("SetIOValue", boost::bind(&Control::meth_Dummy, this, _1))
+            (&control_variables_.setIO_pin, "_Set IO Pin Number")
+            (&control_variables_.setIO_value, "_Set IO Value");
             
         createVariable("applyingParams", &control_variables_.applyingParams, false, boost::bind(&Control::var_Dummy, _1), "_applyingParams");
         
@@ -679,6 +684,15 @@ public:
     /* Call: SetAccessMode to change operation mode */
     bool setAccessMode(uint8_t mode, uint32_t hash) {       
         return call_method("SetAccessMode", StructParser()(&mode)(&hash).generate());
+    }
+    
+    /* Call: SetIOValue to set pins */
+    bool setIOValue(uint8_t pin_number, bool value) {
+		if(pin_number>=4) {
+			ROS_ERROR("allowed pin numbeer: 0-3");
+			return false;
+		}
+        return call_method("SetIOValue", StructParser()(&pin_number)(&value).generate());
     }
     
     bool setAccessMode(const EUserLevel user_level, const uint32_t hash=0) {
