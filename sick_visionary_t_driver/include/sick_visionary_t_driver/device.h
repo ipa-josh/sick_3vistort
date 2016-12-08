@@ -407,6 +407,7 @@ public:
     enum EIntegrationTime {MS_0500=0, MS_1000=1, MS_1500=2, MS_2000=3, MS_2500=4};
     enum EPowerMode {ACTIVE=0, STREAMING_STANDBY=1};
     enum EThreeLevel {INVALID=0, ERROR=1, WARNING=2, GOOD=3};
+    enum EConfAlgo {SQUAREAMP=0, SIMPLESTATIC=1, SINGLESHOT=2, CONTINUOUS=3};
     
     Control(boost::asio::io_service& io_service, const std::string &remote_device_ip,
         const boost::function<void(const ControlVariables &, const DiagnoseInfo &)> &diag_callback) :
@@ -496,7 +497,12 @@ public:
         createVariable("mountingTilt", &control_variables_.mountingTilt, true, boost::bind(&Control::var_DiagVar, this, _1), "Sensor mounting tilt");
         createVariable("mountingAngle", &control_variables_.mountingAngle, true, boost::bind(&Control::var_DiagVar, this, _1), "Sensor mounting angle");
         createVariable("mountingHeight", &control_variables_.mountingHeight, true, boost::bind(&Control::var_DiagVar, this, _1), "Sensor mounting height");
-        createEnumVariable("confAlgo", &control_variables_.confAlgo, true, boost::bind(&Control::var_DiagVar, this, _1), "Confidence algorithm");
+        
+        createEnumVariable("confAlgo", &control_variables_.confAlgo, true, boost::bind(&Control::var_DiagVar, this, _1), "Confidence algorithm")
+            COLA_ENUM(SQUAREAMP)
+            COLA_ENUM(SIMPLESTATIC)
+            COLA_ENUM(SINGLESHOT)
+            COLA_ENUM(CONTINUOUS);
         createEnumVariable("integrationTime", &control_variables_.integrationTime, true, boost::bind(&Control::var_DiagVar, this, _1), "Integration time")
             COLA_ENUM(MS_0500)
             COLA_ENUM(MS_1000)
