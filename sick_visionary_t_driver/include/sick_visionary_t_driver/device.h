@@ -83,6 +83,9 @@ struct ControlVariables {
     uint8_t integrationTime;
     uint8_t nareThreshold;
     uint8_t modFreq;
+    float mountingTilt;
+    float mountingAngle;
+    float mountingHeight;
     
     //health
     uint8_t TmpLvl;
@@ -490,6 +493,9 @@ public:
         createVariable("enPolar", &control_variables_.enablePolarScan, false, boost::bind(&Control::var_DiagVar, this, _1), "_Polar Scan enabled");
         createVariable("enCart", &control_variables_.enableCartMap, false, boost::bind(&Control::var_DiagVar, this, _1), "_Cartesian Map enabled");
         
+        createVariable("mountingTilt", &control_variables_.mountingTilt, true, boost::bind(&Control::var_DiagVar, this, _1), "Sensor mounting tilt");
+        createVariable("mountingAngle", &control_variables_.mountingAngle, true, boost::bind(&Control::var_DiagVar, this, _1), "Sensor mounting angle");
+        createVariable("mountingHeight", &control_variables_.mountingHeight, true, boost::bind(&Control::var_DiagVar, this, _1), "Sensor mounting height");
         createEnumVariable("confAlgo", &control_variables_.confAlgo, true, boost::bind(&Control::var_DiagVar, this, _1), "Confidence algorithm");
         createEnumVariable("integrationTime", &control_variables_.integrationTime, true, boost::bind(&Control::var_DiagVar, this, _1), "Integration time")
             COLA_ENUM(MS_0500)
